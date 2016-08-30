@@ -33,11 +33,11 @@ public class Client extends Thread{
         System.out.println("Just connected to "+ socket.getRemoteSocketAddress());
     }
 
-    public String getIntent(String message){
+    private String getIntent(String message){
         return null;
     }
 
-    public void send(String message){
+    private void send(String message){
         try {
             OutputStream outTputStream = socket.getOutputStream();
             DataOutputStream out = new DataOutputStream(outTputStream);
@@ -60,7 +60,7 @@ public class Client extends Thread{
         return responseMessage;
     }
 
-    public void responseHandler(String message){
+    private void responseHandler(String message){
         //todo handle response message with another attribute for decide what to do with it
         System.out.println("Server says " + message);
     }
@@ -100,7 +100,7 @@ public class Client extends Thread{
         return inputMsg;
     }
 
-    public void shakeHands(){
+    private void shakeHands(){
         //todo other handshake things if existing
         send(userName);
     }
