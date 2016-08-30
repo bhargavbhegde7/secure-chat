@@ -1,0 +1,4 @@
+/ChatClient/target
+/ChatServer/target
+*iml
+*/.idea
