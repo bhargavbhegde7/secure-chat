@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.*;
 import java.net.Socket;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -13,6 +14,8 @@ import java.util.Scanner;
  * Created by goodbytes on 8/28/2016.
  */
 public class Client extends Thread{
+
+    private static final String GET_CLIENTS = "%getclients%";
 
     private String serverName;
     private int port;
@@ -74,23 +77,6 @@ public class Client extends Thread{
             String responseMessage = receive();//todo handle null
             System.out.println("server says : "+responseMessage);
         }
-
-        /**
-         * request for the client list
-         */
-        if(input.equals("%getclients%")){
-            send("%getclients%");
-            String responseMessage = receive();
-
-            ObjectMapper mapper = new ObjectMapper();
-            Map<Integer, String> map = new HashMap<Integer, String>();
-
-            try {
-                    map = mapper.readValue(responseMessage, new TypeReference<Map<Integer, String>>() {});
-            }catch(IOException e){
-                e.printStackTrace();
-            }
-        }
     }
 
     private String getUserInput(){
@@ -102,12 +88,40 @@ public class Client extends Thread{
 
     private void shakeHands(){
         //todo other handshake things if existing
-        send(userName);
+    }
+
+    private void getClients(){
+        send(GET_CLIENTS);
+        String responseMessage = receive();
+
+        ObjectMapper mapper = new ObjectMapper();
+        Map<Integer, String> idUserNameMap;
+
+        try{
+            idUserNameMap = mapper.readValue(responseMessage, new TypeReference<Map<Integer, String>>() {});
+            Iterator it = idUserNameMap.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry pair = (Map.Entry)it.next();
+                System.out.println(pair.getKey() + " = " + pair.getValue());
+                it.remove(); // avoids a ConcurrentModificationException
+            }
+            System.out.println("\n\n");
+            System.out.println("Enter the user id of the target clients with comma separated values");//todo move this to main thread
+
+        }catch(IOException e){
+            e.printStackTrace();
+        }
     }
 
     @Override
-    public void run() {
+    public void run(){
         shakeHands();
+
+        /* ------- initial communication ------- */
+        send(userName);
+        getClients();
+        /* ------- initial communication ------- */
+
         while(true) {
             String inputMsg = getUserInput();
             handleUserInput(inputMsg);
