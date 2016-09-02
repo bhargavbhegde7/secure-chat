@@ -59,6 +59,15 @@ public class ClientHandler implements Runnable{
         }
     }
 
+    public List<Client> removeClient(List<Client> clients, Client client){
+        for(Client c : clients){
+            if(c.getId() == client.getId()){
+                clients.remove(c);
+            }
+        }
+        return clients;
+    }
+
     public void run() {
         DataInputStream in = null;
         try{
@@ -83,6 +92,7 @@ public class ClientHandler implements Runnable{
         }
         try {
             client.getSocket().close();
+            Server.clients = removeClient(Server.clients, client);
         } catch (IOException e) {
             e.printStackTrace();
         }

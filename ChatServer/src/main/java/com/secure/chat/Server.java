@@ -22,6 +22,8 @@ public class Server extends Thread
         clients = new ArrayList<Client>();
     }
 
+
+
     @Override
     public void run(){
         while(true){
