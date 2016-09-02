@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
@@ -19,7 +18,7 @@ public class Client extends Thread{
 
     private String serverName;
     private int port;
-    private Socket socket = null;
+    private static Socket socket = null;
     private String userName;
 
     public Client(String serverIp, int serverPort, String uname){
@@ -68,17 +67,6 @@ public class Client extends Thread{
         System.out.println("Server says " + message);
     }
 
-    private void handleUserInput(String input){
-        /**
-         * send an echo message
-         */
-        if(input.contains("%getecho%")){
-            send("%getecho%");
-            String responseMessage = receive();//todo handle null
-            System.out.println("server says : "+responseMessage);
-        }
-    }
-
     private String getUserInput(){
         System.out.println("enter message");
         Scanner scan = new Scanner(System.in);
@@ -90,41 +78,65 @@ public class Client extends Thread{
         //todo other handshake things if existing
     }
 
-    private void getClients(){
+    private void printMap(Map map){
+        Iterator it = map.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry pair = (Map.Entry)it.next();
+            System.out.println(pair.getKey() + " = " + pair.getValue());
+            it.remove(); // avoids a ConcurrentModificationException
+        }
+        System.out.println("\n\n");
+    }
+
+    private Map<Integer,String> getClients(){
         send(GET_CLIENTS);
         String responseMessage = receive();
 
         ObjectMapper mapper = new ObjectMapper();
-        Map<Integer, String> idUserNameMap;
+        Map<Integer, String> idUserNameMap = null;
 
         try{
             idUserNameMap = mapper.readValue(responseMessage, new TypeReference<Map<Integer, String>>() {});
-            Iterator it = idUserNameMap.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry pair = (Map.Entry)it.next();
-                System.out.println(pair.getKey() + " = " + pair.getValue());
-                it.remove(); // avoids a ConcurrentModificationException
-            }
-            System.out.println("\n\n");
-            System.out.println("Enter the user id of the target clients with comma separated values");//todo move this to main thread
-
         }catch(IOException e){
             e.printStackTrace();
         }
+        return idUserNameMap;
+    }
+
+    private void startListener(){
+        Thread listenerThread = new Thread(new Runnable() {
+            public void run() {
+                String serverMsg;
+                while(true){
+                    serverMsg = receive();
+                    System.out.println(serverMsg);
+                }
+            }
+        });
+        listenerThread.start();
     }
 
     @Override
     public void run(){
-        shakeHands();
+        String inputMsg;
+        //shakeHands();//todo
 
         /* ------- initial communication ------- */
         send(userName);
-        getClients();
+        Map idUserNameMap = getClients();
+        printMap(idUserNameMap);
+        System.out.println("Enter the user id of the target clients with comma separated values");//todo move this to main thread
+        inputMsg = getUserInput();
+        send(inputMsg);
         /* ------- initial communication ------- */
 
+        /* start a thread to keep listening to the server */
+        startListener();
+
+        /* in this thread, keep getting user input and sending it asynch */
         while(true) {
-            String inputMsg = getUserInput();
-            handleUserInput(inputMsg);
+            inputMsg = getUserInput();
+            send(inputMsg);
         }
     }
 }

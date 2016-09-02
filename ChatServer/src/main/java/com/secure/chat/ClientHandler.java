@@ -76,7 +76,6 @@ public class ClientHandler implements Runnable{
                 System.out.println(message);
 
                 handleClientMessage(message);
-
             } catch (IOException e) {
                 e.printStackTrace();
                 break;

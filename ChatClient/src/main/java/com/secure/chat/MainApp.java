@@ -1,9 +1,5 @@
 package com.secure.chat;
 
-import java.io.*;
-import java.net.Socket;
-import java.util.Scanner;
-
 /**
  * Created by goodbytes on 8/28/2016.
  */
