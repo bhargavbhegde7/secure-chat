@@ -5,8 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.Iterator;
-import java.util.Map;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.util.List;
 import java.util.Scanner;
 
 /**
@@ -20,30 +21,59 @@ public class Client extends Thread{
     private int port;
     private static Socket socket = null;
     private String userName;
+    private PublicKey publicKey;
+    private PrivateKey privateKey;
 
-    public Client(String serverIp, int serverPort, String uname){
+    private OutputStream outTputStream;
+    private DataOutputStream out;
+
+    private InputStream inFromServer;
+    private DataInputStream in;
+
+    public Client(String serverIp, int serverPort, String uname, PublicKey pubKey, PrivateKey privKey){
+
+        this.publicKey = pubKey;
+        this.privateKey = privKey;
+
         this.serverName = serverIp;
         this.port = serverPort;
         this.userName = uname;
 
         System.out.println("Connecting to " + serverName +" on port " + port);
         try {
-            socket = new Socket(serverName, port);
+            this.socket = new Socket(serverName, port);
+
+            this.outTputStream = socket.getOutputStream();
+            this.out = new DataOutputStream(outTputStream);
+
+            this.inFromServer = socket.getInputStream();
+            this.in = new DataInputStream(inFromServer);
         }catch(IOException e){
             e.printStackTrace();
         }
         System.out.println("Just connected to "+ socket.getRemoteSocketAddress());
     }
 
-    private String getIntent(String message){
-        return null;
+    private void sendUTF(String message){
+        try {
+            out.writeUTF(message);
+        }catch(IOException e){
+            e.printStackTrace();
+        }
     }
 
-    private void send(String message){
+    private void sendBytes(byte[] message){
         try {
-            OutputStream outTputStream = socket.getOutputStream();
-            DataOutputStream out = new DataOutputStream(outTputStream);
-            out.writeUTF(message);
+            sendInt(message.length);
+            out.write(message);
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    private void sendInt(int message){
+        try {
+            out.writeInt(message);
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -52,19 +82,11 @@ public class Client extends Thread{
     private String receive(){
         String responseMessage = null;
         try{
-            InputStream inFromServer = socket.getInputStream();
-            DataInputStream in = new DataInputStream(inFromServer);
             responseMessage = in.readUTF();
-            //responseHandler(responseMessage);
         }catch(IOException e){
             e.printStackTrace();
         }
         return responseMessage;
-    }
-
-    private void responseHandler(String message){
-        //todo handle response message with another attribute for decide what to do with it
-        System.out.println("Server says " + message);
     }
 
     private String getUserInput(){
@@ -74,33 +96,26 @@ public class Client extends Thread{
         return inputMsg;
     }
 
-    private void shakeHands(){
-        //todo other handshake things if existing
-    }
+    private void printHolders(List<ClientHolder> holders){
 
-    private void printMap(Map map){
-        Iterator it = map.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry pair = (Map.Entry)it.next();
-            System.out.println(pair.getKey() + " = " + pair.getValue());
-            it.remove(); // avoids a ConcurrentModificationException
+        for(ClientHolder ch : holders){
+            System.out.println(" id : "+ ch.getId() +" , "+" userName : "+ch.getUserName());
         }
+
         System.out.println("\n\n");
     }
 
-    private Map<Integer,String> getClients(){
-        send(GET_CLIENTS);
-        String responseMessage = receive();
+    private List<ClientHolder> getClients(String clientsJSON){
 
         ObjectMapper mapper = new ObjectMapper();
-        Map<Integer, String> idUserNameMap = null;
+        List<ClientHolder> holders = null;
 
         try{
-            idUserNameMap = mapper.readValue(responseMessage, new TypeReference<Map<Integer, String>>() {});
+            holders = mapper.readValue(clientsJSON, new TypeReference<List<ClientHolder>>() {});
         }catch(IOException e){
             e.printStackTrace();
         }
-        return idUserNameMap;
+        return holders;
     }
 
     private void startListener(){
@@ -119,24 +134,34 @@ public class Client extends Thread{
     @Override
     public void run(){
         String inputMsg;
-        //shakeHands();//todo
 
         /* ------- initial communication ------- */
-        send(userName);
-        Map idUserNameMap = getClients();
-        printMap(idUserNameMap);
-        System.out.println("Enter the user id of the target clients with comma separated values");//todo move this to main thread
+        //send userName
+        sendUTF(userName);
+
+        //send public key
+        sendBytes(publicKey.getEncoded());
+
+        //get all connected clients details
+        String clientsJSON = receive();
+        List<ClientHolder> holders = getClients(clientsJSON);
+
+        printHolders(holders);
+        System.out.println("Enter the user id of the target clients with comma separated values");
+
+        //get target clients from user
+        //todo keep list of targets in the client (or not !!) undecided
         inputMsg = getUserInput();
-        send(inputMsg);
+        sendUTF(inputMsg);
         /* ------- initial communication ------- */
 
         /* start a thread to keep listening to the server */
         startListener();
 
-        /* in this thread, keep getting user input and sending it asynch */
+        /* in the current thread, keep getting user input and sending it asynch */
         while(true) {
             inputMsg = getUserInput();
-            send(inputMsg);
+            sendUTF(inputMsg);
         }
     }
 }
