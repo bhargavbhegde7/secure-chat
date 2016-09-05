@@ -15,8 +15,6 @@ import java.util.Scanner;
  */
 public class Client extends Thread{
 
-    private static final String GET_CLIENTS = "%getclients%";
-
     private String serverName;
     private int port;
     private static Socket socket = null;
