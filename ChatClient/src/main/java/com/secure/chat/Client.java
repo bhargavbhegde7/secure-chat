@@ -15,36 +15,30 @@ import java.util.Scanner;
  */
 public class Client extends Thread{
 
-    private String serverName;
-    private int port;
-    private static Socket socket = null;
     private String userName;
     private PublicKey publicKey;
     private PrivateKey privateKey;
 
-    private OutputStream outTputStream;
     private DataOutputStream out;
 
-    private InputStream inFromServer;
     private DataInputStream in;
 
-    public Client(String serverIp, int serverPort, String uname, PublicKey pubKey, PrivateKey privKey){
+    public Client(String serverIp, int serverPort, String uName, PublicKey pubKey, PrivateKey privKey){
 
+        Socket socket = null;
         this.publicKey = pubKey;
         this.privateKey = privKey;
 
-        this.serverName = serverIp;
-        this.port = serverPort;
-        this.userName = uname;
+        this.userName = uName;
 
-        System.out.println("Connecting to " + serverName +" on port " + port);
+        System.out.println("Connecting to " + serverIp +" on port " + serverPort);
         try {
-            this.socket = new Socket(serverName, port);
+            socket = new Socket(serverIp, serverPort);
 
-            this.outTputStream = socket.getOutputStream();
-            this.out = new DataOutputStream(outTputStream);
+            OutputStream outputStream = socket.getOutputStream();
+            this.out = new DataOutputStream(outputStream);
 
-            this.inFromServer = socket.getInputStream();
+            InputStream inFromServer = socket.getInputStream();
             this.in = new DataInputStream(inFromServer);
         }catch(IOException e){
             e.printStackTrace();
@@ -147,10 +141,10 @@ public class Client extends Thread{
         printHolders(holders);
         System.out.println("Enter the user id of the target clients with comma separated values");
 
-        //get target clients from user
-        //todo keep list of targets in the client (or not !!) undecided
+        //get target client ID from user
+        //todo keep target in the client
         inputMsg = getUserInput();
-        sendUTF(inputMsg);
+        sendInt(Integer.parseInt(inputMsg));
         /* ------- initial communication ------- */
 
         /* start a thread to keep listening to the server */

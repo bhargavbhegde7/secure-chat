@@ -12,11 +12,20 @@ public class Client {
     private int id;
     private String userName;
     private PublicKey publicKey;
+    private ClientHolder clientHolder;
 
     public Client(Socket socketInstance) {
         this.socket = socketInstance;
         clientCount = clientCount+1;
         id = clientCount;
+    }
+
+    public void setClientHolder(ClientHolder holder){
+        this.clientHolder = clientHolder;
+    }
+
+    public ClientHolder getClientHolder(){
+        return clientHolder;
     }
 
     public String getUserName() {

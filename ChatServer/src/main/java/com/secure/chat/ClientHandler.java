@@ -15,9 +15,24 @@ import java.util.List;
  * Created by goodbytes on 8/28/2016.
  */
 public class ClientHandler implements Runnable{
+
     private Client client;
+
+    private DataInputStream in;
+
+    private DataOutputStream out;
+
     public ClientHandler(Client clientInstance){
         this.client = clientInstance;
+        try {
+            InputStream inFromClient = client.getSocket().getInputStream();
+            in = new DataInputStream(inFromClient);
+
+            OutputStream outputStream = client.getSocket().getOutputStream();
+            out = new DataOutputStream(outputStream);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private List<ClientHolder> getClientsMap(List<Client> clients){
@@ -44,13 +59,10 @@ public class ClientHandler implements Runnable{
         }catch(IOException e){
             e.printStackTrace();
         }
-
     }
 
     private void send(String message){
         try {
-            OutputStream outTputStream = client.getSocket().getOutputStream();
-            DataOutputStream out = new DataOutputStream(outTputStream);
             out.writeUTF(message);
         }catch(IOException e){
             e.printStackTrace();
@@ -66,12 +78,20 @@ public class ClientHandler implements Runnable{
         return clients;
     }
 
-    private String receive(){
+    private String receiveUTF(){
         String responseMessage = null;
         try{
-            InputStream inFromClient = client.getSocket().getInputStream();
-            DataInputStream in = new DataInputStream(inFromClient);
             responseMessage = in.readUTF();
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+        return responseMessage;
+    }
+
+    private int receiveInt(){
+        int responseMessage = 0;
+        try{
+            responseMessage = in.readInt();
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -80,20 +100,29 @@ public class ClientHandler implements Runnable{
 
     public void handleClientMessage(String message){
         //// TODO: 9/5/2016
-        //send it to all the targets of the current client
+        //send it to the target of the current client
+    }
+
+    private Client getClientByID(int targetClientID, List<Client> clients){
+        Client targetClient = null;
+        for(Client c : clients){
+            if(c.getId() == targetClientID){
+                targetClient = c;
+                break;
+            }
+        }
+        return targetClient;
     }
 
     public void run() {
-        DataInputStream in = null;
         try{
-            in = new DataInputStream(client.getSocket().getInputStream());
 
             //read username
-            String message = receive();
+            String message = receiveUTF();
             client.setUserName(message);
 
             //read public key
-            int length = in.readInt();// read length of incoming message
+            int length = receiveInt();// read length of incoming message
             byte[] pubKey = new byte[0];
             if(length>0) {
                 pubKey = new byte[length];
@@ -117,13 +146,15 @@ public class ClientHandler implements Runnable{
         sendClientsJSON();
 
         //get the target clients
-        String targetCSV = receive();
-        //todo set list of client targets in each client
-        //todo set the client targets
+        int targetClientID = receiveInt();
+        Client targetClient = getClientByID(targetClientID, Server.clients);
+        ClientHolder holder = new ClientHolder(targetClient.getId(), targetClient.getUserName(), targetClient.getPublicKey().getEncoded());
+        client.setClientHolder(holder);
+
         while(true){
             try {
                 //keep listening to the client
-                String message = receive();
+                String message = receiveUTF();
                 //message handler
                 handleClientMessage(message);
             } catch (Exception e) {//IOException if client disconnects
