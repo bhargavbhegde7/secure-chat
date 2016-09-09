@@ -3,6 +3,7 @@ package com.secure.chat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
+import java.net.Socket;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
@@ -99,8 +100,20 @@ public class ClientHandler implements Runnable{
     }
 
     public void handleClientMessage(String message){
-        //// TODO: 9/5/2016
-        //send it to the target of the current client
+
+        ClientHolder target = client.getClientHolder();
+
+        Client targetClient = getClientByID(target.getId(), Server.clients);
+        Socket targetSocket = targetClient.getSocket();
+
+        try{
+            OutputStream targetOutputStream = targetSocket.getOutputStream();
+            DataOutputStream targetOut = new DataOutputStream(targetOutputStream);
+
+            targetOut.writeUTF(message);
+        }catch(IOException e){
+            e.printStackTrace();
+        }
     }
 
     private Client getClientByID(int targetClientID, List<Client> clients){

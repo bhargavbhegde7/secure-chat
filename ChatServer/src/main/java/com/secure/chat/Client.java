@@ -21,7 +21,7 @@ public class Client {
     }
 
     public void setClientHolder(ClientHolder holder){
-        this.clientHolder = clientHolder;
+        this.clientHolder = holder;
     }
 
     public ClientHolder getClientHolder(){

@@ -23,6 +23,16 @@ public class Client extends Thread{
 
     private DataInputStream in;
 
+    private ClientHolder clientHolder;
+
+    public void setClientHolder(ClientHolder holder){
+        this.clientHolder = holder;
+    }
+
+    public ClientHolder getClientHolder(){
+        return clientHolder;
+    }
+
     public Client(String serverIp, int serverPort, String uName, PublicKey pubKey, PrivateKey privKey){
 
         Socket socket = null;
@@ -123,6 +133,17 @@ public class Client extends Thread{
         listenerThread.start();
     }
 
+    public ClientHolder getClientHolderByID(int id, List<ClientHolder> holders){
+        ClientHolder holder = null;
+        for(ClientHolder h : holders){
+            if(h.getId() == id){
+                holder = h;
+                break;
+            }
+        }
+        return holder;
+    }
+
     @Override
     public void run(){
         String inputMsg;
@@ -145,6 +166,8 @@ public class Client extends Thread{
         //todo keep target in the client
         inputMsg = getUserInput();
         sendInt(Integer.parseInt(inputMsg));
+
+        setClientHolder(getClientHolderByID(Integer.parseInt(inputMsg), holders));
         /* ------- initial communication ------- */
 
         /* start a thread to keep listening to the server */
