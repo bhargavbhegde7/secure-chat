@@ -81,7 +81,7 @@ public class Client extends Thread{
         }
     }
 
-    private String receive(){
+    private String receiveUTF(){
         String responseMessage = null;
         try{
             responseMessage = in.readUTF();
@@ -107,7 +107,7 @@ public class Client extends Thread{
         System.out.println("\n\n");
     }
 
-    private List<ClientHolder> getClients(String clientsJSON){
+    private List<ClientHolder> getClientsFromJSON(String clientsJSON){
 
         ObjectMapper mapper = new ObjectMapper();
         List<ClientHolder> holders = null;
@@ -120,13 +120,30 @@ public class Client extends Thread{
         return holders;
     }
 
+    private void handleServerMessage(String serverMsg){
+        //System.out.println(serverMsg);//todo remove this
+
+        if(serverMsg.contains("%^targetChange^%")){
+            //prompt out the target id of the caller
+            System.out.println(serverMsg+" : respond with y/n");
+            //take user input (yes or no)
+            String isAccepted = getUserInput();
+            //send response (yes or no)
+            sendUTF(isAccepted);
+        }
+
+        else{
+            System.out.println(serverMsg);
+        }
+    }
+
     private void startListener(){
         Thread listenerThread = new Thread(new Runnable() {
             public void run() {
                 String serverMsg;
                 while(true){
-                    serverMsg = receive();
-                    System.out.println(serverMsg);
+                    serverMsg = receiveUTF();
+                    handleServerMessage(serverMsg);
                 }
             }
         });
@@ -144,6 +161,18 @@ public class Client extends Thread{
         return holder;
     }
 
+    private void handleUserInput(String inputMsg){
+        if(inputMsg.contains("%^getClientsList^%")){
+            sendUTF(inputMsg);
+
+            //wait for target accepted or declined
+
+        }
+        else{
+            sendUTF(inputMsg);
+        }
+    }
+
     @Override
     public void run(){
         String inputMsg;
@@ -156,8 +185,8 @@ public class Client extends Thread{
         sendBytes(publicKey.getEncoded());
 
         //get all connected clients details
-        String clientsJSON = receive();
-        List<ClientHolder> holders = getClients(clientsJSON);
+        String clientsJSON = receiveUTF();
+        List<ClientHolder> holders = getClientsFromJSON(clientsJSON);
 
         printHolders(holders);
         System.out.println("Enter the user id of the target clients with comma separated values");
@@ -176,7 +205,8 @@ public class Client extends Thread{
         /* in the current thread, keep getting user input and sending it asynch */
         while(true) {
             inputMsg = getUserInput();
-            sendUTF(inputMsg);
+            //sendUTF(inputMsg);
+            handleUserInput(inputMsg);
         }
     }
 }

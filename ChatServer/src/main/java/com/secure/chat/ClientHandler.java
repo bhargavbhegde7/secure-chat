@@ -49,20 +49,20 @@ public class ClientHandler implements Runnable{
 
     private void sendClientsJSON(){
         /**
-         * send the json map of all the clients connected
+         * sendUTF the json map of all the clients connected
          */
         try{
             ObjectMapper mapper = new ObjectMapper();
 
             String clientsListJSON = mapper.writeValueAsString(getClientsMap(Server.clients));
 
-            send(clientsListJSON);
+            sendUTF(clientsListJSON);
         }catch(IOException e){
             e.printStackTrace();
         }
     }
 
-    private void send(String message){
+    private void sendUTF(String message){
         try {
             out.writeUTF(message);
         }catch(IOException e){
@@ -101,18 +101,42 @@ public class ClientHandler implements Runnable{
 
     public void handleClientMessage(String message){
 
-        ClientHolder target = client.getClientHolder();
+        if(message.contains("%^getClientsList^%")){
 
-        Client targetClient = getClientByID(target.getId(), Server.clients);
-        Socket targetSocket = targetClient.getSocket();
+            //sendUTF all the peers
+            sendClientsJSON();
 
-        try{
-            OutputStream targetOutputStream = targetSocket.getOutputStream();
-            DataOutputStream targetOut = new DataOutputStream(targetOutputStream);
+            //receive the target client
+            int targetClientID = receiveInt();
+            Client targetClient = getClientByID(targetClientID, Server.clients);
+            ClientHolder holder = new ClientHolder(targetClient.getId(), targetClient.getUserName(), targetClient.getPublicKey().getEncoded());
 
-            targetOut.writeUTF(message);
-        }catch(IOException e){
-            e.printStackTrace();
+            if(targetAccepts()){
+                client.setClientHolder(holder);
+                //send target accepted message
+                sendUTF("yes");
+            }
+
+            else{
+                //send target declined message
+                sendUTF("no");
+            }
+        }
+
+        else{
+            ClientHolder target = client.getClientHolder();
+
+            Client targetClient = getClientByID(target.getId(), Server.clients);
+            Socket targetSocket = targetClient.getSocket();
+
+            try{
+                OutputStream targetOutputStream = targetSocket.getOutputStream();
+                DataOutputStream targetOut = new DataOutputStream(targetOutputStream);
+
+                targetOut.writeUTF(message);
+            }catch(IOException e){
+                e.printStackTrace();
+            }
         }
     }
 
@@ -155,14 +179,14 @@ public class ClientHandler implements Runnable{
             e.printStackTrace();
         }
 
-        //send details of all the clients
-        sendClientsJSON();
+        //sendUTF details of all the clients
+        //sendClientsJSON();
 
-        //get the target clients
-        int targetClientID = receiveInt();
+        //get the target client
+        /*int targetClientID = receiveInt();
         Client targetClient = getClientByID(targetClientID, Server.clients);
         ClientHolder holder = new ClientHolder(targetClient.getId(), targetClient.getUserName(), targetClient.getPublicKey().getEncoded());
-        client.setClientHolder(holder);
+        client.setClientHolder(holder);*/
 
         while(true){
             try {

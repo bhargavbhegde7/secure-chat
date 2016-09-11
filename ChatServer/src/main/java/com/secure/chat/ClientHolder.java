@@ -2,6 +2,10 @@ package com.secure.chat;
 
 /**
  * Created by goodbytes on 9/5/2016.
+ *
+ * this class is used for holding the target client in every peer.
+ * using this holder the server figures out which client is talking to which
+ *
  */
 public class ClientHolder {
     private int id;
