@@ -56,18 +56,37 @@ public class ClientHandler implements Runnable{
 
             String clientsListJSON = mapper.writeValueAsString(getClientsMap(Server.clients));
 
-            sendUTF(clientsListJSON);
+            sendString(clientsListJSON);
         }catch(IOException e){
             e.printStackTrace();
         }
     }
 
-    private void sendUTF(String message){
+    private void sendString(String message){
         try {
-            out.writeUTF(message);
+            sendInt(message.length());
+            out.write(message.getBytes("UTF-8"));
         }catch(IOException e){
             e.printStackTrace();
         }
+    }
+
+    private void sendInt(int message){
+        try {
+            out.writeInt(message);
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    private byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+                                 + Character.digit(s.charAt(i+1), 16));
+        }
+        return data;
     }
 
     public List<Client> removeClient(List<Client> clients, Client client){
@@ -79,64 +98,120 @@ public class ClientHandler implements Runnable{
         return clients;
     }
 
-    private String receiveUTF(){
-        String responseMessage = null;
-        try{
-            responseMessage = in.readUTF();
-        }catch(IOException e){
-            e.printStackTrace();
+    private String receiveString(){
+        int length = receiveInt();// read length of incoming message
+        byte[] bytes = new byte[0];
+        if(length>0) {
+            bytes = new byte[length];
+            try{
+                in.readFully(bytes, 0, bytes.length); // read the message
+            }catch(IOException e){
+                e.printStackTrace();
+            }
         }
-        return responseMessage;
+        return new String(bytes);
+    }
+
+    private byte[] receiveByteArray(){
+        int length = receiveInt();// read length of incoming message
+        byte[] bytes = new byte[0];
+        if(length>0) {
+            bytes = new byte[length];
+            try{
+                in.readFully(bytes, 0, bytes.length); // read the message
+            }catch(IOException e){
+                e.printStackTrace();
+            }
+        }
+        return bytes;
     }
 
     private int receiveInt(){
-        int responseMessage = 0;
+        int message = 0;
         try{
-            responseMessage = in.readInt();
+            message = in.readInt();
         }catch(IOException e){
             e.printStackTrace();
         }
-        return responseMessage;
+        return message;
     }
 
-    public void handleClientMessage(String message){
+    private boolean targetAccepts(int clientID){
+        //get target client
+        Client targetClient = getClientByID(clientID, Server.clients);
+
+        //sendString request alert 'targetchange' request
+
+        try{
+            OutputStream targetOutputStream = targetClient.getSocket().getOutputStream();
+            DataOutputStream targetDataOutputStream = new DataOutputStream(targetOutputStream);
+            targetDataOutputStream.writeUTF("%^targetChange^% client with uname "+client.getUserName()+" wants to connect ");
+        }
+        catch(IOException e){
+            e.printStackTrace();
+        }
+
+        //receiveString ack
+        String ack = receiveString();
+
+        //return
+        if("y".equals(ack))
+        {
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    private void handleClientMessage(String message){
 
         if(message.contains("%^getClientsList^%")){
 
             //sendUTF all the peers
             sendClientsJSON();
 
-            //receive the target client
+            //receiveString the target client
             int targetClientID = receiveInt();
             Client targetClient = getClientByID(targetClientID, Server.clients);
             ClientHolder holder = new ClientHolder(targetClient.getId(), targetClient.getUserName(), targetClient.getPublicKey().getEncoded());
 
-            if(targetAccepts()){
+            //check with the target if it's okay to change its target
+            if(targetAccepts(targetClientID)){
                 client.setClientHolder(holder);
-                //send target accepted message
-                sendUTF("yes");
+                //sendString target accepted message
+                sendString("yes");
             }
-
             else{
-                //send target declined message
-                sendUTF("no");
+                //sendString target declined message
+                sendString("no");
             }
         }
 
         else{
-            ClientHolder target = client.getClientHolder();
+            //target is not set yet
+            if(client.getClientHolder()==null){
 
-            Client targetClient = getClientByID(target.getId(), Server.clients);
-            Socket targetSocket = targetClient.getSocket();
+                 //tell the client that target is not set
+                sendString("Set a target by sending %^getClientsList^% to the server as a message");
 
-            try{
-                OutputStream targetOutputStream = targetSocket.getOutputStream();
-                DataOutputStream targetOut = new DataOutputStream(targetOutputStream);
-
-                targetOut.writeUTF(message);
-            }catch(IOException e){
-                e.printStackTrace();
             }
+            else{
+                ClientHolder target = client.getClientHolder();
+
+                Client targetClient = getClientByID(target.getId(), Server.clients);
+                Socket targetSocket = targetClient.getSocket();
+
+                try{
+                    OutputStream targetOutputStream = targetSocket.getOutputStream();
+                    DataOutputStream targetOut = new DataOutputStream(targetOutputStream);
+
+                    targetOut.writeUTF(message);
+                }catch(IOException e){
+                    e.printStackTrace();
+                }
+            }
+
         }
     }
 
@@ -152,46 +227,30 @@ public class ClientHandler implements Runnable{
     }
 
     public void run() {
+
+        String message;
+
+        //read username
+        message = receiveString();
+        client.setUserName(message);
+
+        //read public key
+        byte[] pubKey = receiveByteArray();
+
         try{
-
-            //read username
-            String message = receiveUTF();
-            client.setUserName(message);
-
-            //read public key
-            int length = receiveInt();// read length of incoming message
-            byte[] pubKey = new byte[0];
-            if(length>0) {
-                pubKey = new byte[length];
-                in.readFully(pubKey, 0, pubKey.length); // read the message
-            }
-            try{
-                //set public key for current client
-                PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pubKey));
-                client.setPublicKey(publicKey);
-            }catch (NoSuchAlgorithmException e) {
-                e.printStackTrace();
-            } catch (InvalidKeySpecException e) {
-                e.printStackTrace();
-            }
-
-        }catch(IOException e){
+            //set public key for current client
+            PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pubKey));
+            client.setPublicKey(publicKey);
+        }catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
             e.printStackTrace();
         }
-
-        //sendUTF details of all the clients
-        //sendClientsJSON();
-
-        //get the target client
-        /*int targetClientID = receiveInt();
-        Client targetClient = getClientByID(targetClientID, Server.clients);
-        ClientHolder holder = new ClientHolder(targetClient.getId(), targetClient.getUserName(), targetClient.getPublicKey().getEncoded());
-        client.setClientHolder(holder);*/
 
         while(true){
             try {
                 //keep listening to the client
-                String message = receiveUTF();
+                message = receiveString();
                 //message handler
                 handleClientMessage(message);
             } catch (Exception e) {//IOException if client disconnects

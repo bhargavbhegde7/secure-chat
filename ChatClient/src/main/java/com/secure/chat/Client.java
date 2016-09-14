@@ -25,9 +25,9 @@ public class Client extends Thread{
 
     private ClientHolder clientHolder;
 
-    public void setClientHolder(ClientHolder holder){
+    /*public void setClientHolder(ClientHolder holder){
         this.clientHolder = holder;
-    }
+    }*/
 
     public ClientHolder getClientHolder(){
         return clientHolder;
@@ -56,14 +56,6 @@ public class Client extends Thread{
         System.out.println("Just connected to "+ socket.getRemoteSocketAddress());
     }
 
-    private void sendUTF(String message){
-        try {
-            out.writeUTF(message);
-        }catch(IOException e){
-            e.printStackTrace();
-        }
-    }
-
     private void sendBytes(byte[] message){
         try {
             sendInt(message.length);
@@ -81,10 +73,61 @@ public class Client extends Thread{
         }
     }
 
-    private String receiveUTF(){
+    private void send(String message){
+        try {
+            sendInt(message.length());
+            //out.write(hexStringToByteArray(message));
+            out.write(message.getBytes("UTF-8"));
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    private byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+                                 + Character.digit(s.charAt(i+1), 16));
+        }
+        return data;
+    }
+
+    /*private String receive(){
         String responseMessage = null;
         try{
             responseMessage = in.readUTF();
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+        return responseMessage;
+    }*/
+
+    private String receiveString(){
+        int length = receiveInt();// read length of incoming message
+        byte[] bytes = receiveByteArray(length);
+        return new String(bytes);
+    }
+
+    private byte[] receiveByteArray(int length){
+        System.out.println("waiting for incoming bytes");
+        byte[] bytes = new byte[0];
+        if(length>0) {
+            bytes = new byte[length];
+            try{
+                in.readFully(bytes, 0, bytes.length); // read the message
+            }catch(IOException e){
+                e.printStackTrace();
+            }
+        }
+        return bytes;
+    }
+
+    private int receiveInt(){
+        System.out.println("waiting for incoming int");
+        int responseMessage = 0;
+        try{
+            responseMessage = in.readInt();
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -121,7 +164,6 @@ public class Client extends Thread{
     }
 
     private void handleServerMessage(String serverMsg){
-        //System.out.println(serverMsg);//todo remove this
 
         if(serverMsg.contains("%^targetChange^%")){
             //prompt out the target id of the caller
@@ -129,7 +171,7 @@ public class Client extends Thread{
             //take user input (yes or no)
             String isAccepted = getUserInput();
             //send response (yes or no)
-            sendUTF(isAccepted);
+            send(isAccepted);
         }
 
         else{
@@ -142,7 +184,7 @@ public class Client extends Thread{
             public void run() {
                 String serverMsg;
                 while(true){
-                    serverMsg = receiveUTF();
+                    serverMsg = receiveString();
                     handleServerMessage(serverMsg);
                 }
             }
@@ -163,13 +205,40 @@ public class Client extends Thread{
 
     private void handleUserInput(String inputMsg){
         if(inputMsg.contains("%^getClientsList^%")){
-            sendUTF(inputMsg);
+
+            send(inputMsg);
+
+            //receive clients
+            String clientsJSON = receiveString();
+            List<ClientHolder> holders = getClientsFromJSON(clientsJSON);
+
+            //show clients
+            printHolders(holders);
+            System.out.println("Enter the user id of the target client");
+
+            //get client target from userinput
+            //get target client ID from user
+            //todo keep target in the client
+            inputMsg = getUserInput();
+
+            //send target id
+            sendInt(Integer.parseInt(inputMsg));
 
             //wait for target accepted or declined
+            String accepted = receiveString();
 
+            //if accepted
+            if("yes".equals(accepted)){
+                //change current target
+                this.clientHolder = getClientHolderByID(Integer.parseInt(inputMsg), holders);
+            }
+            else{
+                //do nothing
+            }
         }
         else{
-            sendUTF(inputMsg);
+            //simple message. send it directly
+            send(inputMsg);
         }
     }
 
@@ -179,24 +248,13 @@ public class Client extends Thread{
 
         /* ------- initial communication ------- */
         //send userName
-        sendUTF(userName);
+        send(userName);
 
         //send public key
         sendBytes(publicKey.getEncoded());
 
         //get all connected clients details
-        String clientsJSON = receiveUTF();
-        List<ClientHolder> holders = getClientsFromJSON(clientsJSON);
 
-        printHolders(holders);
-        System.out.println("Enter the user id of the target clients with comma separated values");
-
-        //get target client ID from user
-        //todo keep target in the client
-        inputMsg = getUserInput();
-        sendInt(Integer.parseInt(inputMsg));
-
-        setClientHolder(getClientHolderByID(Integer.parseInt(inputMsg), holders));
         /* ------- initial communication ------- */
 
         /* start a thread to keep listening to the server */
