@@ -191,7 +191,7 @@ public class Client extends Thread{
     }*/
 
     private void startServerListenerThread(){
-        Thread userInputThread = new Thread(new Runnable() {//todo lambda
+        Thread serverListenerThread = new Thread(new Runnable() {//todo lambda
             public void run() {
                 String serverMsg;
                 while(true){
@@ -200,7 +200,7 @@ public class Client extends Thread{
                 }
             }
         });
-        userInputThread.start();
+        serverListenerThread.start();
     }
 
     public ClientHolder getClientHolderByID(int id, List<ClientHolder> holders){
@@ -220,7 +220,7 @@ public class Client extends Thread{
             sendString(inputMsg);
 
             //receive clients
-             String clientsJSON = receiveString();
+            String clientsJSON = receiveString();
             List<ClientHolder> holders = getClientsFromJSON(clientsJSON);
 
             //show clients
@@ -265,9 +265,16 @@ public class Client extends Thread{
 
         //separate thread to keep getting user input and handling it asynch
         //startUserInputListenerThread();
-        startServerListenerThread();
+        //startServerListenerThread();
 
-        startUserInputListener();
+        //startUserInputListener();
         //startServerListener();
+
+        //keep listening to server message
+        String serverMsg;
+        while(true){
+            serverMsg = receiveString();
+            handleServerMessage(serverMsg);
+        }
     }
 }

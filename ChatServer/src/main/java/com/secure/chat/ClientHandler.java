@@ -220,8 +220,8 @@ public class ClientHandler implements Runnable{
         int keyLength = receiveInt();
         byte[] pubKey = receiveByteArray(keyLength);
 
+        //set public key for current client
         try{
-            //set public key for current client
             PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pubKey));
             client.setPublicKey(publicKey);
         }catch (NoSuchAlgorithmException e) {
@@ -229,6 +229,8 @@ public class ClientHandler implements Runnable{
         } catch (InvalidKeySpecException e) {
             e.printStackTrace();
         }
+
+        sendString("%&READY&%");
 
         while(true){
             try {
