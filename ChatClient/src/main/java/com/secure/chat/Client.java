@@ -19,15 +19,13 @@ public class Client extends Thread{
     private PublicKey publicKey;
     private PrivateKey privateKey;
 
-    private DataOutputStream out;
+    private DataOutputStream dataOutputStream;
 
-    private DataInputStream in;
+    private DataInputStream dataInputStream;
 
     private ClientHolder clientHolder;
 
-    /*public void setClientHolder(ClientHolder holder){
-        this.clientHolder = holder;
-    }*/
+    private Socket socket;
 
     public ClientHolder getClientHolder(){
         return clientHolder;
@@ -35,7 +33,7 @@ public class Client extends Thread{
 
     public Client(String serverIp, int serverPort, String uName, PublicKey pubKey, PrivateKey privKey){
 
-        Socket socket = null;
+        //Socket socket = null;
         this.publicKey = pubKey;
         this.privateKey = privKey;
 
@@ -46,10 +44,10 @@ public class Client extends Thread{
             socket = new Socket(serverIp, serverPort);
 
             OutputStream outputStream = socket.getOutputStream();
-            this.out = new DataOutputStream(outputStream);
+            this.dataOutputStream = new DataOutputStream(outputStream);
 
             InputStream inFromServer = socket.getInputStream();
-            this.in = new DataInputStream(inFromServer);
+            this.dataInputStream = new DataInputStream(inFromServer);
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -59,7 +57,7 @@ public class Client extends Thread{
     private void sendBytes(byte[] message){
         try {
             sendInt(message.length);
-            out.write(message);
+            dataOutputStream.write(message);
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -67,43 +65,23 @@ public class Client extends Thread{
 
     private void sendInt(int message){
         try {
-            out.writeInt(message);
+            dataOutputStream.writeInt(message);
         }catch(IOException e){
             e.printStackTrace();
         }
     }
 
-    private void send(String message){
+    private void sendString(String message){
         try {
             sendInt(message.length());
-            //out.write(hexStringToByteArray(message));
-            out.write(message.getBytes("UTF-8"));
+            dataOutputStream.write(message.getBytes("UTF-8"));
         }catch(IOException e){
             e.printStackTrace();
         }
     }
-
-    private byte[] hexStringToByteArray(String s) {
-        int len = s.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
-                                 + Character.digit(s.charAt(i+1), 16));
-        }
-        return data;
-    }
-
-    /*private String receive(){
-        String responseMessage = null;
-        try{
-            responseMessage = in.readUTF();
-        }catch(IOException e){
-            e.printStackTrace();
-        }
-        return responseMessage;
-    }*/
 
     private String receiveString(){
+
         int length = receiveInt();// read length of incoming message
         byte[] bytes = receiveByteArray(length);
         return new String(bytes);
@@ -115,7 +93,7 @@ public class Client extends Thread{
         if(length>0) {
             bytes = new byte[length];
             try{
-                in.readFully(bytes, 0, bytes.length); // read the message
+                dataInputStream.readFully(bytes, 0, bytes.length); // read the message
             }catch(IOException e){
                 e.printStackTrace();
             }
@@ -127,7 +105,7 @@ public class Client extends Thread{
         System.out.println("waiting for incoming int");
         int responseMessage = 0;
         try{
-            responseMessage = in.readInt();
+            responseMessage = dataInputStream.readInt();
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -165,22 +143,55 @@ public class Client extends Thread{
 
     private void handleServerMessage(String serverMsg){
 
+        //check if it's any special signal
         if(serverMsg.contains("%^targetChange^%")){
-            //prompt out the target id of the caller
+            //prompt the target id of the caller
             System.out.println(serverMsg+" : respond with y/n");
             //take user input (yes or no)
             String isAccepted = getUserInput();
-            //send response (yes or no)
-            send(isAccepted);
+            //sendString response (yes or no)
+            sendString(isAccepted);
         }
-
         else{
+            //print it and wait for the user to respond
             System.out.println(serverMsg);
+            String inputMsg = getUserInput();
+            //sendUTF(inputMsg);
+            handleUserInput(inputMsg);
         }
     }
 
-    private void startListener(){
-        Thread listenerThread = new Thread(new Runnable() {
+    /*private void startUserInputListenerThread(){
+        Thread userInputThread = new Thread(new Runnable() {//todo lambda
+            public void run() {
+                String userInput;
+                while(true){
+                    userInput = getUserInput();
+                    handleUserInput(userInput);
+                }
+            }
+        });
+        userInputThread.start();
+    }*/
+
+    private void startUserInputListener(){
+        String userInput;
+        while(true){
+            userInput = getUserInput();
+            handleUserInput(userInput);
+        }
+    }
+
+    /*private void startServerListener(){
+        String serverMsg;
+        while(true){
+            serverMsg = receiveString();
+            handleServerMessage(serverMsg);
+        }
+    }*/
+
+    private void startServerListenerThread(){
+        Thread userInputThread = new Thread(new Runnable() {//todo lambda
             public void run() {
                 String serverMsg;
                 while(true){
@@ -189,7 +200,7 @@ public class Client extends Thread{
                 }
             }
         });
-        listenerThread.start();
+        userInputThread.start();
     }
 
     public ClientHolder getClientHolderByID(int id, List<ClientHolder> holders){
@@ -206,10 +217,10 @@ public class Client extends Thread{
     private void handleUserInput(String inputMsg){
         if(inputMsg.contains("%^getClientsList^%")){
 
-            send(inputMsg);
+            sendString(inputMsg);
 
             //receive clients
-            String clientsJSON = receiveString();
+             String clientsJSON = receiveString();
             List<ClientHolder> holders = getClientsFromJSON(clientsJSON);
 
             //show clients
@@ -218,10 +229,10 @@ public class Client extends Thread{
 
             //get client target from userinput
             //get target client ID from user
-            //todo keep target in the client
+            //todo keep target dataInputStream the client
             inputMsg = getUserInput();
 
-            //send target id
+            //sendString target id
             sendInt(Integer.parseInt(inputMsg));
 
             //wait for target accepted or declined
@@ -234,37 +245,29 @@ public class Client extends Thread{
             }
             else{
                 //do nothing
+                System.out.println("target rejected the request");
             }
         }
         else{
-            //simple message. send it directly
-            send(inputMsg);
+            //simple message. sendString it directly
+            sendString(inputMsg);
         }
     }
 
     @Override
     public void run(){
-        String inputMsg;
 
-        /* ------- initial communication ------- */
-        //send userName
-        send(userName);
+        //sendString userName
+        sendString(userName);
 
-        //send public key
+        //sendString public key
         sendBytes(publicKey.getEncoded());
 
-        //get all connected clients details
+        //separate thread to keep getting user input and handling it asynch
+        //startUserInputListenerThread();
+        startServerListenerThread();
 
-        /* ------- initial communication ------- */
-
-        /* start a thread to keep listening to the server */
-        startListener();
-
-        /* in the current thread, keep getting user input and sending it asynch */
-        while(true) {
-            inputMsg = getUserInput();
-            //sendUTF(inputMsg);
-            handleUserInput(inputMsg);
-        }
+        startUserInputListener();
+        //startServerListener();
     }
 }

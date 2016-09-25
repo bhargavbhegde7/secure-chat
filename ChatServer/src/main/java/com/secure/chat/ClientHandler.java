@@ -19,18 +19,18 @@ public class ClientHandler implements Runnable{
 
     private Client client;
 
-    private DataInputStream in;
+    private DataInputStream dataInputStream;
 
-    private DataOutputStream out;
+    private DataOutputStream dataOutputStream;
 
     public ClientHandler(Client clientInstance){
         this.client = clientInstance;
         try {
             InputStream inFromClient = client.getSocket().getInputStream();
-            in = new DataInputStream(inFromClient);
+            dataInputStream = new DataInputStream(inFromClient);
 
             OutputStream outputStream = client.getSocket().getOutputStream();
-            out = new DataOutputStream(outputStream);
+            dataOutputStream = new DataOutputStream(outputStream);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -65,7 +65,7 @@ public class ClientHandler implements Runnable{
     private void sendString(String message){
         try {
             sendInt(message.length());
-            out.write(message.getBytes("UTF-8"));
+            dataOutputStream.write(message.getBytes("UTF-8"));
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -73,20 +73,10 @@ public class ClientHandler implements Runnable{
 
     private void sendInt(int message){
         try {
-            out.writeInt(message);
+            dataOutputStream.writeInt(message);
         }catch(IOException e){
             e.printStackTrace();
         }
-    }
-
-    private byte[] hexStringToByteArray(String s) {
-        int len = s.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
-                                 + Character.digit(s.charAt(i+1), 16));
-        }
-        return data;
     }
 
     public List<Client> removeClient(List<Client> clients, Client client){
@@ -99,26 +89,18 @@ public class ClientHandler implements Runnable{
     }
 
     private String receiveString(){
+
         int length = receiveInt();// read length of incoming message
-        byte[] bytes = new byte[0];
-        if(length>0) {
-            bytes = new byte[length];
-            try{
-                in.readFully(bytes, 0, bytes.length); // read the message
-            }catch(IOException e){
-                e.printStackTrace();
-            }
-        }
+        byte[] bytes = receiveByteArray(length);
         return new String(bytes);
     }
 
-    private byte[] receiveByteArray(){
-        int length = receiveInt();// read length of incoming message
+    private byte[] receiveByteArray(int length){
         byte[] bytes = new byte[0];
         if(length>0) {
             bytes = new byte[length];
             try{
-                in.readFully(bytes, 0, bytes.length); // read the message
+                dataInputStream.readFully(bytes, 0, bytes.length); // read the message
             }catch(IOException e){
                 e.printStackTrace();
             }
@@ -129,7 +111,7 @@ public class ClientHandler implements Runnable{
     private int receiveInt(){
         int message = 0;
         try{
-            message = in.readInt();
+            message = dataInputStream.readInt();
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -235,7 +217,8 @@ public class ClientHandler implements Runnable{
         client.setUserName(message);
 
         //read public key
-        byte[] pubKey = receiveByteArray();
+        int keyLength = receiveInt();
+        byte[] pubKey = receiveByteArray(keyLength);
 
         try{
             //set public key for current client
