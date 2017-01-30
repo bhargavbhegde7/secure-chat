@@ -31,7 +31,7 @@ public class ClientHandler implements Runnable{
 
             OutputStream outputStream = client.getSocket().getOutputStream();
             dataOutputStream = new DataOutputStream(outputStream);
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -57,7 +57,7 @@ public class ClientHandler implements Runnable{
             String clientsListJSON = mapper.writeValueAsString(getClientsMap(Server.clients));
 
             sendString(clientsListJSON);
-        }catch(IOException e){
+        }catch(Exception e){
             e.printStackTrace();
         }
     }
@@ -66,7 +66,7 @@ public class ClientHandler implements Runnable{
         try {
             sendInt(message.length());
             dataOutputStream.write(message.getBytes("UTF-8"));
-        }catch(IOException e){
+        }catch(Exception e){
             e.printStackTrace();
         }
     }
@@ -74,7 +74,7 @@ public class ClientHandler implements Runnable{
     private void sendInt(int message){
         try {
             dataOutputStream.writeInt(message);
-        }catch(IOException e){
+        }catch(Exception e){
             e.printStackTrace();
         }
     }
@@ -101,7 +101,7 @@ public class ClientHandler implements Runnable{
             bytes = new byte[length];
             try{
                 dataInputStream.readFully(bytes, 0, bytes.length); // read the message
-            }catch(IOException e){
+            }catch(Exception e){
                 e.printStackTrace();
             }
         }
@@ -112,7 +112,8 @@ public class ClientHandler implements Runnable{
         int message = 0;
         try{
             message = dataInputStream.readInt();
-        }catch(IOException e){
+        }catch(Exception e){
+            closeConnection(client);
             e.printStackTrace();
         }
         return message;
@@ -129,7 +130,7 @@ public class ClientHandler implements Runnable{
             DataOutputStream targetDataOutputStream = new DataOutputStream(targetOutputStream);
             targetDataOutputStream.writeUTF("%^targetChange^% client with uname "+client.getUserName()+" wants to connect ");
         }
-        catch(IOException e){
+        catch(Exception e){
             e.printStackTrace();
         }
 
@@ -189,7 +190,7 @@ public class ClientHandler implements Runnable{
                     DataOutputStream targetOut = new DataOutputStream(targetOutputStream);
 
                     targetOut.writeUTF(message);
-                }catch(IOException e){
+                }catch(Exception e){
                     e.printStackTrace();
                 }
             }
@@ -206,6 +207,18 @@ public class ClientHandler implements Runnable{
             }
         }
         return targetClient;
+    }
+
+    private boolean closeConnection(Client client){
+        boolean status = false;
+        try {
+            client.getSocket().close();
+            Server.clients = removeClient(Server.clients, client);
+            status = true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return status;
     }
 
     public void run() {
@@ -238,15 +251,15 @@ public class ClientHandler implements Runnable{
                 message = receiveString();
                 //message handler
                 handleClientMessage(message);
-            } catch (Exception e) {//IOException if client disconnects
+            } catch (Exception e) {//Exception if client disconnects
+                closeConnection(client);
                 e.printStackTrace();
                 break;
             }
         }
         try {
-            client.getSocket().close();
-            Server.clients = removeClient(Server.clients, client);
-        } catch (IOException e) {
+            closeConnection(client);
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }//run ends
